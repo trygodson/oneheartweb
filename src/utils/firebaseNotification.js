@@ -2,7 +2,7 @@ import { messaging, getToken, onMessage } from '../config/firebase';
 import { toast } from 'react-toastify';
 
 // Your VAPID key from Firebase Console (Cloud Messaging -> Web Push certificates)
-const VAPID_KEY = 'BJMWNgkMrwBTAy4p5DdBJZRiqHyjthOp6hT87zH9RAYbIu5Wbx4GEHdiT7BQ7y6Qf1557bKdvmMfaDNRVAE-Uvo';
+const VAPID_KEY = '';
 
 /**
  * Request permission for notifications
