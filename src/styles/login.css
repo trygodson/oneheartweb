@@ -1,0 +1,129 @@
+:root {
+  --purple: #41010b;
+}
+
+.login {
+  height: 100vh;
+  color: white;
+  /* background-color: #e9e9eb; */
+}
+
+.login .logo {
+  width: 150px;
+}
+
+.login .left {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: black;
+  margin: 0 auto;
+  font-size: 14px;
+  background-color: transparent;
+  width: 100%;
+}
+
+.login .left .form-container h2 {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.login .left form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 35px;
+}
+
+.login .left form input,
+.register input {
+  border: 1px solid gainsboro;
+  padding: 12px 10px;
+  border-radius: 4px;
+  outline: none;
+  background-color: white;
+  font-size: 14px;
+  height: 25px;
+}
+
+.login .left form input:hover,
+.register input:hover {
+  border: 1px solid var(--purple);
+}
+
+.forgot-password {
+  text-align: right;
+  font-weight: 500;
+  color: var(--purple);
+}
+
+.login .form-footer {
+  border-top: 1px solid gainsboro;
+  padding-top: 30px;
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.login .form-footer div {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.login .no-account {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  margin-top: 30px;
+  text-align: center;
+}
+
+.login .no-account span {
+  color: var(--purple);
+  font-weight: 500;
+}
+
+.login .right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--purple);
+  background-image: url(../assets/images/Pattern.svg);
+  padding: 15px 30px;
+  text-align: center;
+}
+
+.login .right h3 {
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+
+.login-footer p {
+  font-size: 12px;
+}
+
+.login .right .login-img {
+  border-radius: 10px;
+  overflow: hidden;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+}
+
+.custom-bg {
+  background-color: rgba(54, 0, 0, 0.91);
+  fill: rgb(215, 204, 204);
+  background-size: 343px 343px;
+  background-repeat: repeat;
+  background-image: url();
+  /* background-image: url("data:image/svg+xml;charset=utf8,%3Csvg id='Layer_2' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500' fill-opacity='1' style='enable-background:new 0 0 500 500'%3E%3Cstyle%3E .st0{fill:rgb(215, 204, 204)} %3C/style%3E%3Cpath class='st0' d='M136.3 119c0-5.5-4.5-10-10-10-4 0-7.4 2.3-9 5.7-1.6-3.3-5-5.7-9-5.7-5.5 0-10 4.5-10 10 0 11 19 23 19 23s19-11 19-23zM382.7 142.5l-.3-.2c-.8-.5-19.2-12.3-19.2-23.4 0-5.8 4.7-10.5 10.5-10.5 3.7 0 7.1 1.9 9 5.1 1.9-3.2 5.3-5.1 9-5.1 5.8 0 10.5 4.7 10.5 10.5 0 12.1-18.5 23-19.2 23.4l-.3.2zm-8.9-33c-5.2 0-9.5 4.3-9.5 9.5 0 9.9 16.3 20.9 18.5 22.4 2.3-1.4 18.5-11.6 18.5-22.4 0-5.2-4.3-9.5-9.5-9.5-3.7 0-6.9 2.1-8.5 5.4l-.5.9-.5-.9c-1.6-3.4-4.9-5.4-8.5-5.4z'/%3E%3Cg%3E%3Cpath class='st0' d='M363.8 368c0-5.5 4.5-10 10-10 4 0 7.4 2.3 9 5.7 1.6-3.3 5-5.7 9-5.7 5.5 0 10 4.5 10 10 0 11-19 23-19 23s-19-11-19-23zM117.3 391.5l-.3-.2c-.8-.5-19.2-11.3-19.2-23.4 0-5.8 4.7-10.5 10.5-10.5 3.7 0 7.1 1.9 9 5.1 1.9-3.2 5.3-5.1 9-5.1 5.8 0 10.5 4.7 10.5 10.5 0 11.1-18.4 22.9-19.2 23.4l-.3.2zm-9-33c-5.2 0-9.5 4.3-9.5 9.5 0 10.8 16.2 21 18.5 22.4 2.3-1.5 18.5-12.5 18.5-22.4 0-5.2-4.3-9.5-9.5-9.5-3.7 0-6.9 2.1-8.5 5.4l-.5.9-.5-.9c-1.6-3.4-4.9-5.4-8.5-5.4z'/%3E%3C/g%3E%3C/svg%3E"); */
+}
