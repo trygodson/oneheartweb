@@ -1,4 +1,4 @@
-import { messaging, getToken, onMessage } from '../config/firebase';
+// import { messaging, getToken, onMessage } from '../config/firebase';
 import { toast } from 'react-toastify';
 
 // Your VAPID key from Firebase Console (Cloud Messaging -> Web Push certificates)
@@ -7,48 +7,48 @@ const VAPID_KEY = '';
 /**
  * Request permission for notifications
  */
-export const requestNotificationPermission = async () => {
-  try {
-    const permission = await Notification.requestPermission();
+// export const requestNotificationPermission = async () => {
+//   try {
+//     const permission = await Notification.requestPermission();
 
-    if (permission === 'granted') {
-      console.log('Notification permission granted.');
+//     if (permission === 'granted') {
+//       console.log('Notification permission granted.');
 
-      // Get FCM token
-      const token = await getToken(messaging, {
-        vapidKey: VAPID_KEY,
-      });
+//       // Get FCM token
+//       const token = await getToken(messaging, {
+//         vapidKey: VAPID_KEY,
+//       });
 
-      if (token) {
-        // console.log('FCM Token:', token);
-        // Send this token to your backend to store it
-        return token;
-      } else {
-        console.log('No registration token available.');
-        return null;
-      }
-    } else if (permission === 'denied') {
-      console.log('Notification permission denied.');
-      toast.error('Notification permission denied. Please enable it in browser settings.');
-      return null;
-    }
-  } catch (error) {
-    console.error('Error getting notification permission:', error);
-    toast.error('Error requesting notification permission');
-    return null;
-  }
-};
+//       if (token) {
+//         // console.log('FCM Token:', token);
+//         // Send this token to your backend to store it
+//         return token;
+//       } else {
+//         console.log('No registration token available.');
+//         return null;
+//       }
+//     } else if (permission === 'denied') {
+//       console.log('Notification permission denied.');
+//       toast.error('Notification permission denied. Please enable it in browser settings.');
+//       return null;
+//     }
+//   } catch (error) {
+//     console.error('Error getting notification permission:', error);
+//     toast.error('Error requesting notification permission');
+//     return null;
+//   }
+// };
 
-/**
- * Listen for foreground messages
- */
-export const onMessageListener = () =>
-  new Promise((resolve) => {
-    onMessage(messaging, (payload) => {
-      console.log('Foreground message received:', payload);
-      resolve(payload);
-    });
-  });
+// /**
+//  * Listen for foreground messages
+//  */
+// export const onMessageListener = () =>
+//   new Promise((resolve) => {
+//     onMessage(messaging, (payload) => {
+//       console.log('Foreground message received:', payload);
+//       resolve(payload);
+//     });
+//   });
 
 /**
  * Send token to backend

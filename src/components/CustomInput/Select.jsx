@@ -11,7 +11,7 @@ const CustomSelect = ({ disabled, options, allowFirstOption, className, label, o
       ) : null}
       <div className="relative">
         <select
-          onChange={(e) => onChange(parseInt(e.target.value))}
+          onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           className={` text-gray-600 w-full h-[50px] appearance-none px-2 py-3 rounded border focus-within:border-primary hover:border-primary outline-none mt-1 text-sm ${className}`}
         >

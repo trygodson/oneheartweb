@@ -18,7 +18,7 @@ import { SET_STORAGE_ITEM } from '../../config/storage';
 import { LoginService } from '../../services/authServices';
 import customToast from '../../components/Toast/toastify';
 import { setAuthorizationHeader } from '../../config/api';
-import { useNotification } from '../../context/notificationContext';
+// import { useNotification } from '../../context/notificationContext';
 
 export const Login = () => {
   // const { loading } = useSelector((state) => state.authenticate);
@@ -34,11 +34,11 @@ export const Login = () => {
       password: Yup.string().required('Password is required'),
     }),
     onSubmit(values) {
-      const formData = new FormData();
-      formData.append('email', values.email);
-      formData.append('password', values.password);
+      // const formData = new FormData();
+      // formData.append('email', values.email);
+      // formData.append('password', values.password);
       // fcmToken && formData.append('device_token', fcmToken);
-      return LoginService(formData)
+      return LoginService(values)
         .then((res) => {
           // console.log(res, '====login response===');
           if (res?.success) {
@@ -47,7 +47,8 @@ export const Login = () => {
             setAuthorizationHeader(res?.data?.accessToken);
             setLogin(res?.data);
             // delete res.data.access_token;
-            SET_STORAGE_ITEM('user', res.data);
+            SET_STORAGE_ITEM('user', { user: res.data?.user });
+
             setUserData(res.data);
             customToast(res?.message ?? 'Login Successfull');
             navigate('/app/home', {

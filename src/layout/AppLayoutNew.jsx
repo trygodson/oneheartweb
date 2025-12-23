@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { FiLogOut, FiChevronRight, FiFileText } from 'react-icons/fi';
+import { FiLogOut, FiChevronRight, FiFileText, FiShoppingBag, FiPackage, FiMapPin } from 'react-icons/fi';
 import { GoBell, GoPerson, GoPersonFill } from 'react-icons/go';
 import { GrCircleQuestion, GrSearch } from 'react-icons/gr';
 import { LuChartPie } from 'react-icons/lu';
@@ -12,7 +12,8 @@ import { GET_STORAGE_ITEM, REMOVE_STORAGE_ITEM } from '../config/storage';
 import { useDispatch, useSelector } from 'react-redux';
 import { userPermissions } from '../utils/userPermissions';
 import { useAuthContext } from '../context/authContext';
-import { MdOutlineTask } from 'react-icons/md';
+import { MdRestaurant, MdStore, MdMoreHoriz } from 'react-icons/md';
+import { IoWalletOutline } from 'react-icons/io5';
 
 export const handleLogout = () => {
   REMOVE_STORAGE_ITEM('token');
@@ -136,10 +137,60 @@ export const AppLayoutNew = ({ children, noHeader = false }) => {
       permissions: [],
     },
     {
-      name: 'KYC Management',
-      path: '/app/kyc',
-
-      icon: <MdOutlineTask size={20} />,
+      name: 'Bakeries',
+      path: '/app/bakeries',
+      icon: <MdRestaurant size={20} />,
+      // permissions: [userPermissions.inspectorAdmin,],
+      permissions: [...Object.values(userPermissions).map((r) => r)],
+    },
+    {
+      name: 'Shops',
+      path: '/app/shops',
+      icon: <FiShoppingBag size={20} />,
+      hasSubMenu: true,
+      subMenu: [
+        {
+          name: 'Shops',
+          path: '/app/shops',
+          icon: <FiShoppingBag size={20} />,
+        },
+        {
+          name: 'Shop Orders',
+          path: '/app/shop-orders',
+          icon: <FiShoppingBag size={20} />,
+        },
+      ],
+      permissions: [...Object.values(userPermissions).map((r) => r)],
+    },
+    {
+      name: 'Products',
+      path: '/app/products',
+      icon: <FiPackage size={20} />,
+      permissions: [...Object.values(userPermissions).map((r) => r)],
+    },
+    {
+      name: 'Transactions',
+      path: '/app/trx',
+      icon: <IoWalletOutline size={20} />,
+      permissions: [...Object.values(userPermissions).map((r) => r)],
+    },
+    {
+      name: 'Others',
+      path: '/app/other',
+      icon: <MdMoreHoriz size={20} />,
+      hasSubMenu: true,
+      subMenu: [
+        {
+          name: 'Delivery Zone',
+          path: '/app/delivery-zone',
+          icon: <FiMapPin size={20} />,
+        },
+        {
+          name: 'Delivery Personnel',
+          path: '/app/delivery-personnel',
+          icon: <GoPersonFill size={20} />,
+        },
+      ],
       permissions: [...Object.values(userPermissions).map((r) => r)],
     },
   ];
@@ -314,7 +365,7 @@ export const AppLayoutNew = ({ children, noHeader = false }) => {
             </ul>
           </div>
 
-          <div className="mt-auto text-white">
+          <div className="mt-auto">
             <ul className="px-5">
               {subMenuPermsionedList.map((item, idx) => (
                 <li
@@ -333,6 +384,17 @@ export const AppLayoutNew = ({ children, noHeader = false }) => {
                 </li>
               ))}
             </ul>
+
+            {/* Logout Button */}
+            <div className="px-5 mt-6 mb-5">
+              <button
+                onClick={handleLogout}
+                className="w-full py-3 px-6 flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-300"
+              >
+                <FiLogOut size={18} />
+                <span className="font-medium">Logout</span>
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -347,13 +409,13 @@ export const AppLayoutNew = ({ children, noHeader = false }) => {
               >
                 <BiMenu size={24} className="text-gray-700" />
               </button>
-              <div className=" flex items-center w-full px-4 py-2 rounded-full  bg-gray-100 focus:outline-none">
-                <GrSearch size={17} />
-                <input type="text" placeholder="Search" className="ml-3 bg-gray-100" />
-              </div>
+              {/* <div className=" flex items-center w-full px-4 py-2 rounded-full  bg-gray-100 focus:outline-none">
+               
+               
+              </div> */}
             </div>
             <div className="flex gap-3 items-center">
-              <GrCircleQuestion size={22} />
+              {/* <GrCircleQuestion size={22} /> */}
               {/* <NotificationDropdown /> */}
             </div>
           </header>

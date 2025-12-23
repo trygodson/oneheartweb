@@ -5,7 +5,7 @@ export default {
     extend: {
       colors: {
         bg: '#fff',
-        primary: '#C40C0C',
+        primary: '#FF9E42',
         secondary: '#f57600',
         dimmed_white: 'rgba(255,255,255,.9)',
       },

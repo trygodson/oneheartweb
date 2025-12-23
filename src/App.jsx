@@ -10,7 +10,7 @@ import './App.css';
 import './datepicker.css';
 import { AuthProvider } from './context/authContext';
 import { NotFound } from './layout/NotFound';
-import { NotificationProvider } from './context/notificationContext';
+// import { NotificationProvider } from './context/notificationContext';
 import PermissionedRoute from './utils/PermissionedRoute';
 export const ToggleSidebarContext = createContext();
 

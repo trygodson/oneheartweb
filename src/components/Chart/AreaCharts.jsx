@@ -11,7 +11,7 @@ const AreaCharts = ({ height, data = [] }) => {
     }))
     .reverse();
 
-    console.log(transformedData);
+  console.log(transformedData);
 
   return (
     <ResponsiveContainer className={'-ml-7'} width="102%" height={height || 300}>

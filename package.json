@@ -1,5 +1,5 @@
 {
-  "name": "oneheartweb",
+  "name": "bboy",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -33,6 +33,7 @@
     "react-simple-wysiwyg": "^3.2.0",
     "react-switch": "^7.1.0",
     "react-toastify": "^11.0.3",
+    "recharts": "^3.3.0",
     "swiper": "^11.1.15",
     "yup": "^1.6.1"
   },

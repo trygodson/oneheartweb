@@ -124,8 +124,12 @@ dApis.interceptors.response.use(
       //   handleLogout();
       //   throw refreshError;
       // }
-
-      if (err?.response.data?.message === 'Session Expired') {
+      // console.log('err', err.response);
+      if (
+        err?.response?.data?.message === 'Invalid Token! Please Sign in.' ||
+        err?.response?.data?.message === 'Unauthorized' ||
+        err?.response?.data?.message === 'Token Expired! Please Sign in.'
+      ) {
         handleLogout();
         return;
       } else {

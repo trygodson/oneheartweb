@@ -6,7 +6,7 @@ import { NotFound } from '../layout/NotFound';
 const PermissionedRoute = ({ children, permissions }) => {
   // const { userData } = useAuthContext();
 
-  // // If no permissions are defined, allow access
+  // If no permissions are defined, allow access
   // if (!permissions || permissions.length === 0) {
   //   return children;
   // }

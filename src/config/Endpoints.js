@@ -1,20 +1,27 @@
 // export const BASE_URL = 'https://4fc7-197-210-53-66.ngrok-free.app';
-// export const BASE_URL = "http://51.20.42.165:3001";
-export const BASE_URL = 'http://localhost:3011';
-// export const BASE_URL = 'https://naviscore.smitiv.co/api';
-// export const UPLOAD_ASSET_URL = 'http://localhost:3002';
+// export const BASE_URL = 'https://admin-bbservice.onrender.com';
+export const BASE_URL = 'http://localhost:3013';
 
 export const ApiEndPoints = {
   //AUTH
-  LOGIN: '/admin/login',
-  SEND_RESET_OTP: '/send/reset/otp',
-  VERIFY_RESET_OTP: '/auth/verif_otp',
-  RESET_PASSWORD: '/reset/password',
-  NOTIFICATIONS: '/notifications',
-  USER_PROFILE: '/settings/profile',
-  SUBMIT_USER_PROFILE: '/settings/submit',
-  NOTIFICATIONS_MARK_AS_READ: '/notifications/mark_as_read',
+  LOGIN: '/auth/login',
+  UPLOAD_IMAGE: '/auth/upload',
 
-  KYC_LIST: '/admin/kyc',
-  KYC_STATS: '/admin/kyc/statistics',
+  BAKERIES: '/bakeries',
+  BAKERIES_STATISTICS: '/bakeries/statistics/overall',
+  // BREADS: '/breads',
+  // TRX: '/trx',
+
+  ADMIN_BAKERY_PRODUCT: '/admin-bakery-products',
+
+  SHOPS: '/shops',
+  DELIVERY_ZONE: '/delivery-zones',
+
+  SHOP_ORDERS: '/shop-orders',
+  SHOP_ORDERS_STATISTICS: '/shop-orders/statistics',
+  SHOP_ORDERS_TODAY_BY_DELIVERY_ZONE: '/shop-orders/today/by-delivery-zone',
+
+  DELIVERY_PERSONEL: '/delivery-management/personnel',
+  DELIVERY_PLANS: '/delivery-management/plans',
+  DELIVERY_MANAGEMENT_ORDERS: '/delivery-management/orders',
 };

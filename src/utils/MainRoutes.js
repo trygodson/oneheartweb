@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Login, Register, RequestOTP, ResetPassword, ResetPasswordSuccess, VerifyAccount, VerifyOTP } from '../pages';
+import { Login, } from '../pages';
 import { AppLayoutNew } from '../layout/AppLayoutNew';
 // const Login = lazy(() => import('../pages/Auth/Login/index'));
 // const Register = lazy(() => import('../pages/Auth/Register/index'));
@@ -23,42 +23,42 @@ const earlyRoutes = [
     component: Login,
     guarded: false,
   },
-  {
-    title: 'RequestOTP',
-    path: '/request-otp',
-    component: RequestOTP,
-    guarded: false,
-  },
-  {
-    title: 'VerifyOTP',
-    path: '/verify-otp',
-    component: VerifyOTP,
-    guarded: false,
-  },
-  {
-    title: 'Reset Password',
-    path: '/reset-password',
-    component: ResetPassword,
-    guarded: false,
-  },
-  {
-    title: 'Reset Password Sucess',
-    path: '/reset-success',
-    component: ResetPasswordSuccess,
-    guarded: false,
-  },
-  {
-    title: 'Register',
-    path: '/register',
-    component: Register,
-    guarded: false,
-  },
-  {
-    title: 'Verify OTP',
-    path: '/verify-account',
-    component: VerifyAccount,
-    guarded: false,
-  },
+  // {
+  //   title: 'RequestOTP',
+  //   path: '/request-otp',
+  //   component: RequestOTP,
+  //   guarded: false,
+  // },
+  // {
+  //   title: 'VerifyOTP',
+  //   path: '/verify-otp',
+  //   component: VerifyOTP,
+  //   guarded: false,
+  // },
+  // {
+  //   title: 'Reset Password',
+  //   path: '/reset-password',
+  //   component: ResetPassword,
+  //   guarded: false,
+  // },
+  // {
+  //   title: 'Reset Password Sucess',
+  //   path: '/reset-success',
+  //   component: ResetPasswordSuccess,
+  //   guarded: false,
+  // },
+  // {
+  //   title: 'Register',
+  //   path: '/register',
+  //   component: Register,
+  //   guarded: false,
+  // },
+  // {
+  //   title: 'Verify OTP',
+  //   path: '/verify-account',
+  //   component: VerifyAccount,
+  //   guarded: false,
+  // },
   // {
   //   title: 'Create Business',
   //   path: '/create-business',

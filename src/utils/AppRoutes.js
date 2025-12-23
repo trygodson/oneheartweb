@@ -1,6 +1,17 @@
-import { NotFound } from '../layout/NotFound';
-import { Dashboard } from '../pages';
-import { KYCList, KYCDetails } from '../pages/KYC';
+import {
+  Bakeries,
+  BakeryDetail,
+  BakeryOrders,
+  Dashboard,
+  Shops,
+  ShopDetail,
+  ShopOrders,
+  DeliveryZoneClassification,
+  DeliveryZones,
+  DeliveryPersonnel,
+  DeliveryPersonnelDetail,
+  DeliveryPersonnelTransactions,
+} from '../pages';
 import { userPermissions } from './userPermissions';
 
 export const AppRoutes = [
@@ -19,16 +30,79 @@ export const AppRoutes = [
     permissions: [...Object.values(userPermissions).map((r) => r)],
   },
   {
-    title: 'KYC Management',
-    path: 'kyc',
-    component: KYCList,
+    title: 'Bakeries',
+    path: 'bakeries',
+    component: Bakeries,
     header: true,
     permissions: [...Object.values(userPermissions).map((r) => r)],
   },
   {
-    title: 'KYC Details',
-    path: 'kyc/:id',
-    component: KYCDetails,
+    title: 'Bakeries Details',
+    path: 'bakeries/:id',
+    component: BakeryDetail,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Bakery Orders',
+    path: 'bakeries/:id/orders',
+    component: BakeryOrders,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Shops',
+    path: 'shops',
+    component: Shops,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Shop Details',
+    path: 'shops/:id',
+    component: ShopDetail,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Shop Orders',
+    path: 'shop-orders',
+    component: ShopOrders,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Delivery Zone Classification',
+    path: 'shop-orders/delivery-zone-classification',
+    component: DeliveryZoneClassification,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Delivery Zones',
+    path: 'delivery-zone',
+    component: DeliveryZones,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Delivery Personnel',
+    path: 'delivery-personnel',
+    component: DeliveryPersonnel,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Delivery Personnel Details',
+    path: 'delivery-personnel/:id',
+    component: DeliveryPersonnelDetail,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Delivery Personnel Transactions',
+    path: 'delivery-personnel/:id/transactions',
+    component: DeliveryPersonnelTransactions,
     header: true,
     permissions: [...Object.values(userPermissions).map((r) => r)],
   },
