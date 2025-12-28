@@ -9,6 +9,9 @@ import {
   DeliveryZoneClassification,
   DeliveryZones,
 } from '../pages';
+import { DeliveryPersonnel } from '../pages/DeliveryPersonnel';
+import { DeliveryPersonnelDetail } from '../pages/DeliveryPersonnel/DeliveryPersonnelDetail';
+import { DeliveryPersonnelTransactions } from '../pages/DeliveryPersonnel/DeliveryPersonnelTransactions';
 import { userPermissions } from './userPermissions';
 
 export const AppRoutes = [
@@ -65,6 +68,27 @@ export const AppRoutes = [
     title: 'Shop Orders',
     path: 'shop-orders',
     component: ShopOrders,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Delivery Personnel',
+    path: 'delivery-personnel',
+    component: DeliveryPersonnel,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Delivery Personnel',
+    path: 'delivery-personnel/:id',
+    component: DeliveryPersonnelDetail,
+    header: true,
+    permissions: [...Object.values(userPermissions).map((r) => r)],
+  },
+  {
+    title: 'Delivery Personnel',
+    path: 'delivery-personnel/:id/transactions',
+    component: DeliveryPersonnelTransactions,
     header: true,
     permissions: [...Object.values(userPermissions).map((r) => r)],
   },

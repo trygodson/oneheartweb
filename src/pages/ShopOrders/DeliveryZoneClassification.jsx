@@ -219,7 +219,8 @@ export function DeliveryZoneClassification() {
 
   const handleDragStart = (e, order, sourceZoneId) => {
     const status = String(order?.status || '').toLowerCase();
-    if (status === 'delivered' || status === 'completed') {
+    // Only allow dragging orders with status "ready"
+    if (status !== 'ready') {
       e.preventDefault();
       return;
     }
@@ -625,18 +626,14 @@ export function DeliveryZoneClassification() {
                     zone.orders.map((order) => (
                       <div
                         key={order._id}
-                        draggable={
-                          String(order?.status || '').toLowerCase() !== 'delivered' &&
-                          String(order?.status || '').toLowerCase() !== 'completed'
-                        }
+                        draggable={String(order?.status || '').toLowerCase() === 'ready'}
                         onDragStart={(e) => handleDragStart(e, order, getZoneKey(zone))}
                         onDragEnd={handleDragEnd}
                         onClick={() => fetchOrderDetail(order._id)}
                         className={`bg-white rounded-lg p-3 shadow-sm border border-gray-200 hover:shadow-md transition-all hover:border-indigo-300 ${
-                          String(order?.status || '').toLowerCase() === 'delivered' ||
-                          String(order?.status || '').toLowerCase() === 'completed'
-                            ? 'cursor-pointer opacity-75'
-                            : 'cursor-move'
+                          String(order?.status || '').toLowerCase() === 'ready'
+                            ? 'cursor-move'
+                            : 'cursor-pointer opacity-75'
                         }`}
                       >
                         <div className="flex items-start justify-between mb-2">
@@ -1000,43 +997,49 @@ export function DeliveryZoneClassification() {
                             {Array.isArray(o?.items) && o.items.length > 0 ? (
                               <div className="mt-3 pt-3 border-t">
                                 <p className="text-xs font-semibold text-gray-700 mb-2">Item Assignments</p>
-                                <div className="space-y-2">
-                                  {o.items.map((it, idx) => {
-                                    const itemAssigned = it?.assignedToDeliveryPersonnelId || '';
-                                    return (
-                                      <div
-                                        key={`${oid}_${idx}`}
-                                        className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded"
-                                      >
-                                        <span className="truncate pr-2 flex-1">
-                                          {it?.productName || 'Item'} {it?.bakeryName ? `• ${it.bakeryName}` : ''} •{' '}
-                                          {it?.quantity ?? ''} {it?.unit || ''} •{' '}
-                                          {it?.totalPrice ? numberFormatter(it.totalPrice) : ''}
-                                        </span>
-                                        <select
-                                          value={itemAssigned}
-                                          onChange={(e) =>
-                                            setItemPersonnel(getZoneKey(selectedZone), oid, idx, e.target.value)
-                                          }
-                                          className="px-2 py-1 border border-gray-300 rounded text-xs min-w-[120px]"
+                                {String(o?.status || '').toLowerCase() !== 'ready' ? (
+                                  <p className="text-xs text-gray-500 italic">
+                                    Only orders with status "ready" can be assigned to delivery personnel.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {o.items.map((it, idx) => {
+                                      const itemAssigned = it?.assignedToDeliveryPersonnelId || '';
+                                      return (
+                                        <div
+                                          key={`${oid}_${idx}`}
+                                          className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded"
                                         >
-                                          <option value="">Unassigned</option>
-                                          {deliveryPersonnel.map((p) => {
-                                            const pid = p?._id;
-                                            const name =
-                                              `${p?.userId?.firstName || ''} ${p?.userId?.lastName || ''}`.trim() ||
-                                              'Unnamed';
-                                            return (
-                                              <option key={pid} value={pid}>
-                                                {name}
-                                              </option>
-                                            );
-                                          })}
-                                        </select>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                                          <span className="truncate pr-2 flex-1">
+                                            {it?.productName || 'Item'} {it?.bakeryName ? `• ${it.bakeryName}` : ''} •{' '}
+                                            {it?.quantity ?? ''} {it?.unit || ''} •{' '}
+                                            {it?.totalPrice ? numberFormatter(it.totalPrice) : ''}
+                                          </span>
+                                          <select
+                                            value={itemAssigned}
+                                            onChange={(e) =>
+                                              setItemPersonnel(getZoneKey(selectedZone), oid, idx, e.target.value)
+                                            }
+                                            className="px-2 py-1 border border-gray-300 rounded text-xs min-w-[120px]"
+                                          >
+                                            <option value="">Unassigned</option>
+                                            {deliveryPersonnel.map((p) => {
+                                              const pid = p?._id;
+                                              const name =
+                                                `${p?.userId?.firstName || ''} ${p?.userId?.lastName || ''}`.trim() ||
+                                                'Unnamed';
+                                              return (
+                                                <option key={pid} value={pid}>
+                                                  {name}
+                                                </option>
+                                              );
+                                            })}
+                                          </select>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             ) : null}
                           </div>

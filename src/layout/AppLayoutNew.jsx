@@ -184,6 +184,11 @@ export const AppLayoutNew = ({ children, noHeader = false }) => {
           path: '/app/delivery-zone',
           icon: <FiMapPin size={20} />,
         },
+        {
+          name: 'Delivery Personnel',
+          path: '/app/delivery-personnel',
+          icon: <FiMapPin size={20} />,
+        },
       ],
       permissions: [...Object.values(userPermissions).map((r) => r)],
     },
