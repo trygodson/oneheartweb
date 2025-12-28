@@ -140,7 +140,6 @@ export const AppLayoutNew = ({ children, noHeader = false }) => {
       name: 'Bakeries',
       path: '/app/bakeries',
       icon: <MdRestaurant size={20} />,
-      // permissions: [userPermissions.inspectorAdmin,],
       permissions: [...Object.values(userPermissions).map((r) => r)],
     },
     {
@@ -184,11 +183,6 @@ export const AppLayoutNew = ({ children, noHeader = false }) => {
           name: 'Delivery Zone',
           path: '/app/delivery-zone',
           icon: <FiMapPin size={20} />,
-        },
-        {
-          name: 'Delivery Personnel',
-          path: '/app/delivery-personnel',
-          icon: <GoPersonFill size={20} />,
         },
       ],
       permissions: [...Object.values(userPermissions).map((r) => r)],

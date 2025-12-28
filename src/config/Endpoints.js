@@ -5,8 +5,6 @@ export const BASE_URL = 'http://localhost:3013';
 export const ApiEndPoints = {
   //AUTH
   LOGIN: '/auth/login',
-  UPLOAD_IMAGE: '/auth/upload',
-
   BAKERIES: '/bakeries',
   BAKERIES_STATISTICS: '/bakeries/statistics/overall',
   // BREADS: '/breads',
@@ -23,5 +21,4 @@ export const ApiEndPoints = {
 
   DELIVERY_PERSONEL: '/delivery-management/personnel',
   DELIVERY_PLANS: '/delivery-management/plans',
-  DELIVERY_MANAGEMENT_ORDERS: '/delivery-management/orders',
 };

@@ -49,7 +49,6 @@ export function BakeryDetail() {
     productId: '',
     shopPrice: '',
     bakeryPrice: '',
-    deliveryFee: '',
     platformNotes: '',
   });
   const [productActionLoading, setProductActionLoading] = useState(false);
@@ -886,17 +885,6 @@ export function BakeryDetail() {
                   onChange={(e) => setPriceFormData({ ...priceFormData, bakeryPrice: parseFloat(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Enter bakery price"
-                  disabled={productActionLoading}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Fee/Item (₦)</label>
-                <input
-                  type="number"
-                  value={priceFormData.deliveryFee}
-                  onChange={(e) => setPriceFormData({ ...priceFormData, deliveryFee: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Enter Delivery Fee"
                   disabled={productActionLoading}
                 />
               </div>

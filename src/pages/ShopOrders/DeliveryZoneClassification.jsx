@@ -22,7 +22,6 @@ import customToast from '../../components/Toast/toastify';
 export function DeliveryZoneClassification() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [savingPlan, setSavingPlan] = useState(false);
   const [zonesData, setZonesData] = useState(null);
   const [orderDetail, setOrderDetail] = useState(null);
   const [selectedDate, setSelectedDate] = useState(moment().format('YYYY-MM-DD'));
@@ -38,6 +37,7 @@ export function DeliveryZoneClassification() {
   const [zoneSummaryOpen, setZoneSummaryOpen] = useState(false);
   const [selectedZoneKey, setSelectedZoneKey] = useState(null);
   const [deliveryPersonnel, setDeliveryPersonnel] = useState([]);
+  const [savingPlan, setSavingPlan] = useState(false);
 
   useEffect(() => {
     fetchStates();
@@ -71,9 +71,6 @@ export function DeliveryZoneClassification() {
   const getZoneKey = (zone) => zone?.zoneId ?? 'no-zone';
 
   const normalizeZonesPayload = (raw) => {
-    // raw is expected to be something like:
-    // { date, totalZones, totalOrders, zones: [...] }
-    // (works for both delivery-plan and today-by-zone)
     const data = raw || {};
     const normalizedZones = (data?.zones || []).map((z) => ({
       ...z,
@@ -85,10 +82,15 @@ export function DeliveryZoneClassification() {
       orders: Array.isArray(z?.orders)
         ? z.orders.map((o) => ({
             ...o,
-            // support both plan-style and today-style ids
             _id: o?._id ?? o?.orderId ?? o?.id,
             orderId: o?.orderId ?? o?._id ?? o?.id,
             assignedToDeliveryPersonnelId: o?.assignedToDeliveryPersonnelId ?? null,
+            items: Array.isArray(o?.items)
+              ? o.items.map((item) => ({
+                  ...item,
+                  assignedToDeliveryPersonnelId: item?.assignedToDeliveryPersonnelId ?? null,
+                }))
+              : [],
           }))
         : [],
     }));
@@ -119,7 +121,6 @@ export function DeliveryZoneClassification() {
 
   const fetchDeliveryPersonnel = async () => {
     try {
-      // Fetch a decent chunk; backend paginates
       const response = await GetDeliveryPersonelService({ page: 1, limit: 200 });
       const payload = response?.data?.success ? response.data : response;
       const list = payload?.data || payload?.data?.data || [];
@@ -200,10 +201,10 @@ export function DeliveryZoneClassification() {
   const fetchOrderDetail = async (id) => {
     try {
       setDetailLoading(true);
-      setDetailModalOpen(true);
       const response = await GetShopOrderDetailByIdService(id);
       if (response?.data?.success || response?.success) {
         setOrderDetail(response?.data?.data || response?.data);
+        setDetailModalOpen(true);
       }
     } catch (error) {
       console.error('Error fetching order detail:', error);
@@ -245,8 +246,7 @@ export function DeliveryZoneClassification() {
 
     // Update zones state
     const updatedZones = zones.map((zone) => {
-      const zoneKey = getZoneKey(zone);
-      if (zoneKey === draggedOrder.sourceZoneId) {
+      if (getZoneKey(zone) === draggedOrder.sourceZoneId) {
         // Remove order from source zone
         return {
           ...zone,
@@ -256,15 +256,21 @@ export function DeliveryZoneClassification() {
           totalItems: Math.max(0, (zone.totalItems || 0) - (draggedOrder.order.itemsCount || 0)),
         };
       }
-      if (zoneKey === targetZoneId) {
-        // Add order to target zone and clear assigned personnel (moved to new zone)
-        const orderWithoutPersonnel = {
+      if (getZoneKey(zone) === targetZoneId) {
+        // Add order to target zone and clear all assignments (moved to new zone)
+        const orderWithoutAssignments = {
           ...draggedOrder.order,
           assignedToDeliveryPersonnelId: null,
+          items: Array.isArray(draggedOrder.order?.items)
+            ? draggedOrder.order.items.map((item) => ({
+                ...item,
+                assignedToDeliveryPersonnelId: null,
+              }))
+            : [],
         };
         return {
           ...zone,
-          orders: [...zone.orders, orderWithoutPersonnel],
+          orders: [...zone.orders, orderWithoutAssignments],
           totalOrders: (zone.totalOrders || 0) + 1,
           totalRevenue: (zone.totalRevenue || 0) + (draggedOrder.order.totalAmount || 0),
           totalItems: (zone.totalItems || 0) + (draggedOrder.order.itemsCount || 0),
@@ -275,6 +281,44 @@ export function DeliveryZoneClassification() {
 
     setZones(updatedZones);
     setDraggedOrder(null);
+  };
+
+  const getStatusBadge = (status) => {
+    const statusColors = {
+      ready: 'bg-green-100 text-green-800',
+      confirmed: 'bg-blue-100 text-blue-800',
+      received: 'bg-yellow-100 text-yellow-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+      cancelled: 'bg-red-100 text-red-800',
+      completed: 'bg-purple-100 text-purple-800',
+    };
+    return (
+      <span
+        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+          statusColors[status?.toLowerCase()] || 'bg-gray-100 text-gray-800'
+        }`}
+      >
+        {status || 'N/A'}
+      </span>
+    );
+  };
+
+  const getPaymentStatusBadge = (status) => {
+    const statusColors = {
+      paid: 'bg-green-100 text-green-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+      failed: 'bg-red-100 text-red-800',
+      refunded: 'bg-purple-100 text-purple-800',
+    };
+    return (
+      <span
+        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+          statusColors[status?.toLowerCase()] || 'bg-gray-100 text-gray-800'
+        }`}
+      >
+        {status || 'N/A'}
+      </span>
+    );
   };
 
   const openZoneSummary = (zoneKey) => {
@@ -308,6 +352,26 @@ export function DeliveryZoneClassification() {
     );
   };
 
+  const setItemPersonnel = (zoneKey, orderId, itemIndex, personnelId) => {
+    setZones((prev) =>
+      prev.map((z) => {
+        if (getZoneKey(z) !== zoneKey) return z;
+        const orders = Array.isArray(z.orders) ? z.orders : [];
+        const nextOrders = orders.map((o) => {
+          const oid = o?._id ?? o?.orderId;
+          if (oid !== orderId) return o;
+          const items = Array.isArray(o.items) ? o.items : [];
+          const nextItems = items.map((item, idx) => {
+            if (idx !== itemIndex) return item;
+            return { ...item, assignedToDeliveryPersonnelId: personnelId || null };
+          });
+          return { ...o, items: nextItems };
+        });
+        return { ...z, orders: nextOrders };
+      }),
+    );
+  };
+
   const handleSavePlan = async () => {
     try {
       if (!selectedCityId) {
@@ -316,6 +380,25 @@ export function DeliveryZoneClassification() {
       }
 
       setSavingPlan(true);
+
+      // Collect all unique personnel IDs from item-level assignments only
+      const allPersonnelIds = new Set();
+      zones.forEach((z) => {
+        if (Array.isArray(z.deliveryPersonnelIds)) {
+          z.deliveryPersonnelIds.forEach((id) => allPersonnelIds.add(id));
+        }
+        if (Array.isArray(z.orders)) {
+          z.orders.forEach((o) => {
+            if (Array.isArray(o.items)) {
+              o.items.forEach((item) => {
+                if (item.assignedToDeliveryPersonnelId) {
+                  allPersonnelIds.add(item.assignedToDeliveryPersonnelId);
+                }
+              });
+            }
+          });
+        }
+      });
 
       const payload = {
         date: selectedDate,
@@ -329,11 +412,10 @@ export function DeliveryZoneClassification() {
           totalRevenue: z?.totalRevenue ?? 0,
           totalItems: z?.totalItems ?? 0,
           uniqueShops: z?.uniqueShops ?? 0,
-          deliveryPersonnelIds: [], // No longer using zone-level assignments
+          deliveryPersonnelIds: Array.from(allPersonnelIds), // All unique personnel IDs
           orders: (Array.isArray(z?.orders) ? z.orders : []).map((o) => ({
             orderId: o?.orderId ?? o?._id ?? null,
             _id: o?._id ?? o?.orderId ?? null,
-            assignedToDeliveryPersonnelId: o?.assignedToDeliveryPersonnelId ?? null,
             orderNumber: o?.orderNumber,
             businessId: o?.businessId,
             businessName: o?.businessName,
@@ -343,7 +425,12 @@ export function DeliveryZoneClassification() {
             paymentStatus: o?.paymentStatus,
             totalAmount: o?.totalAmount,
             itemsCount: o?.itemsCount,
-            items: Array.isArray(o?.items) ? o.items : [],
+            items: (Array.isArray(o?.items) ? o.items : []).map((item) => ({
+              productId: item?.productId ?? item?._id ?? null,
+              productName: item?.productName ?? 'N/A',
+              quantity: item?.quantity ?? 0,
+              assignedToDeliveryPersonnelId: item?.assignedToDeliveryPersonnelId ?? null,
+            })),
           })),
         })),
       };
@@ -363,44 +450,6 @@ export function DeliveryZoneClassification() {
     } finally {
       setSavingPlan(false);
     }
-  };
-
-  const getStatusBadge = (status) => {
-    const statusColors = {
-      ready: 'bg-green-100 text-green-800',
-      confirmed: 'bg-blue-100 text-blue-800',
-      received: 'bg-yellow-100 text-yellow-800',
-      delivered: 'bg-yellow-100 text-yellow-800',
-      cancelled: 'bg-red-100 text-red-800',
-      completed: 'bg-purple-100 text-purple-800',
-    };
-    return (
-      <span
-        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-          statusColors[status?.toLowerCase()] || 'bg-gray-100 text-gray-800'
-        }`}
-      >
-        {status || 'N/A'}
-      </span>
-    );
-  };
-
-  const getPaymentStatusBadge = (status) => {
-    const statusColors = {
-      paid: 'bg-green-100 text-green-800',
-      pending: 'bg-yellow-100 text-yellow-800',
-      failed: 'bg-red-100 text-red-800',
-      refunded: 'bg-purple-100 text-purple-800',
-    };
-    return (
-      <span
-        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-          statusColors[status?.toLowerCase()] || 'bg-gray-100 text-gray-800'
-        }`}
-      >
-        {status || 'N/A'}
-      </span>
-    );
   };
 
   return (
@@ -846,7 +895,7 @@ export function DeliveryZoneClassification() {
         </div>
       )}
 
-      {/* Zone Summary Modal (assign personnel + review orders/items) */}
+      {/* Zone Summary Modal */}
       {zoneSummaryOpen && (
         <div
           data-modal-backdrop
@@ -905,16 +954,16 @@ export function DeliveryZoneClassification() {
                 </div>
 
                 <div className="border rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Orders (assign per order)</h4>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Orders & Items Assignment</h4>
                   {Array.isArray(selectedZone.orders) && selectedZone.orders.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {selectedZone.orders.map((o) => {
                         const oid = o?._id ?? o?.orderId;
                         const assigned = o?.assignedToDeliveryPersonnelId || '';
                         return (
-                          <div key={oid} className="border rounded-lg p-3">
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                              <div className="min-w-0">
+                          <div key={oid} className="border rounded-lg p-4">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                              <div className="min-w-0 flex-1">
                                 <p className="text-sm font-semibold text-gray-900 truncate">{o?.orderNumber || oid}</p>
                                 <p className="text-xs text-gray-500 truncate">{o?.businessName || 'N/A'}</p>
                                 <div className="flex items-center gap-2 mt-2">
@@ -926,12 +975,12 @@ export function DeliveryZoneClassification() {
                                   </span>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <label className="text-xs text-gray-600">Assign:</label>
+                              {/* <div className="flex items-center gap-2">
+                                <label className="text-xs text-gray-600 whitespace-nowrap">Order Assign:</label>
                                 <select
                                   value={assigned}
                                   onChange={(e) => setOrderPersonnel(getZoneKey(selectedZone), oid, e.target.value)}
-                                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[150px]"
                                 >
                                   <option value="">Unassigned</option>
                                   {deliveryPersonnel.map((p) => {
@@ -945,27 +994,48 @@ export function DeliveryZoneClassification() {
                                     );
                                   })}
                                 </select>
-                              </div>
+                              </div> */}
                             </div>
 
                             {Array.isArray(o?.items) && o.items.length > 0 ? (
                               <div className="mt-3 pt-3 border-t">
-                                <p className="text-xs font-semibold text-gray-700 mb-2">Items</p>
-                                <div className="space-y-1">
-                                  {o.items.map((it, idx) => (
-                                    <div
-                                      key={`${oid}_${idx}`}
-                                      className="flex items-center justify-between text-xs text-gray-700"
-                                    >
-                                      <span className="truncate pr-2">
-                                        {it?.productName || 'Item'} {it?.bakeryName ? `• ${it.bakeryName}` : ''}
-                                      </span>
-                                      <span className="text-gray-500 whitespace-nowrap">
-                                        {it?.quantity ?? ''} {it?.unit || ''} •{' '}
-                                        {it?.totalPrice ? numberFormatter(it.totalPrice) : ''}
-                                      </span>
-                                    </div>
-                                  ))}
+                                <p className="text-xs font-semibold text-gray-700 mb-2">Item Assignments</p>
+                                <div className="space-y-2">
+                                  {o.items.map((it, idx) => {
+                                    const itemAssigned = it?.assignedToDeliveryPersonnelId || '';
+                                    return (
+                                      <div
+                                        key={`${oid}_${idx}`}
+                                        className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded"
+                                      >
+                                        <span className="truncate pr-2 flex-1">
+                                          {it?.productName || 'Item'} {it?.bakeryName ? `• ${it.bakeryName}` : ''} •{' '}
+                                          {it?.quantity ?? ''} {it?.unit || ''} •{' '}
+                                          {it?.totalPrice ? numberFormatter(it.totalPrice) : ''}
+                                        </span>
+                                        <select
+                                          value={itemAssigned}
+                                          onChange={(e) =>
+                                            setItemPersonnel(getZoneKey(selectedZone), oid, idx, e.target.value)
+                                          }
+                                          className="px-2 py-1 border border-gray-300 rounded text-xs min-w-[120px]"
+                                        >
+                                          <option value="">Unassigned</option>
+                                          {deliveryPersonnel.map((p) => {
+                                            const pid = p?._id;
+                                            const name =
+                                              `${p?.userId?.firstName || ''} ${p?.userId?.lastName || ''}`.trim() ||
+                                              'Unnamed';
+                                            return (
+                                              <option key={pid} value={pid}>
+                                                {name}
+                                              </option>
+                                            );
+                                          })}
+                                        </select>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             ) : null}
