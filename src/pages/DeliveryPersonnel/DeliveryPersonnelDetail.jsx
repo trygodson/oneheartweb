@@ -6,7 +6,6 @@ import { FiX } from 'react-icons/fi';
 import ReactPaginate from 'react-paginate';
 import moment from 'moment';
 import { GetDeliveryPersonelOrdersService, markOrderAsCompletedService } from '../../services/deliveryPersonelService';
-import { GetShopOrderDetailByIdService } from '../../services/shopOrdersService';
 import { numberFormatter } from '../../utils/helper';
 import empty from '../../assets/images/undraw_no-data.png';
 import customToast from '../../components/Toast/toastify';
@@ -22,7 +21,6 @@ export function DeliveryPersonnelDetail() {
   const [startDate, setStartDate] = useState(moment().subtract(1, 'month').format('YYYY-MM-DD'));
   const [endDate, setEndDate] = useState(moment().format('YYYY-MM-DD'));
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [orderDetail, setOrderDetail] = useState(null);
   const [markingDelivered, setMarkingDelivered] = useState(false);
 
@@ -62,21 +60,9 @@ export function DeliveryPersonnelDetail() {
     setCurrentPage(pageIndex.selected + 1);
   };
 
-  const fetchOrderDetail = async (orderId) => {
-    try {
-      setDetailModalOpen(true);
-      setDetailLoading(true);
-      setOrderDetail(null);
-      const response = await GetShopOrderDetailByIdService(orderId);
-      if (response?.data?.success || response?.success) {
-        setOrderDetail(response?.data?.data || response?.data);
-      }
-    } catch (e) {
-      console.error('Error fetching order detail:', e);
-      setOrderDetail(null);
-    } finally {
-      setDetailLoading(false);
-    }
+  const showOrderDetail = (order) => {
+    setOrderDetail(order);
+    setDetailModalOpen(true);
   };
 
   const getStatusBadge = (status) => {
@@ -118,7 +104,63 @@ export function DeliveryPersonnelDetail() {
     );
   };
 
+  // Check if order status is delivered at top level
+  const isOrderStatusDelivered = (order) => {
+    const orderStatus = String(order?.status || '').toLowerCase();
+    return orderStatus === 'delivered';
+  };
+
+  // Check if all assigned items are delivered
+  const areAllItemsDelivered = (order) => {
+    const assignedItems = Array.isArray(order?.assignedItems) ? order.assignedItems : [];
+    const deliveryInfoItems = Array.isArray(order?.deliveryInfo?.items) ? order.deliveryInfo.items : [];
+
+    if (assignedItems.length === 0) return false;
+
+    // Create a map of delivered items by productId
+    const deliveredItemsMap = new Map();
+    deliveryInfoItems.forEach((deliveredItem) => {
+      const productId = deliveredItem.productId;
+      if (productId) {
+        deliveredItemsMap.set(productId, deliveredItem);
+      }
+    });
+
+    // Check if all assigned items have been delivered
+    return assignedItems.every((assignedItem) => {
+      const productId = assignedItem.productId;
+      if (!productId) return false;
+
+      // Check if item exists in deliveryInfo.items (meaning it's been delivered)
+      const deliveredItem = deliveredItemsMap.get(productId);
+      return !!deliveredItem && deliveredItem.status === 'delivered';
+    });
+  };
+
+  // Check if order can be marked as completed (either all items delivered OR order status is delivered)
+  const canMarkAsCompleted = (order) => {
+    // return areAllItemsDelivered(order) || isOrderStatusDelivered(order);
+    return isOrderStatusDelivered(order);
+  };
+
+  // Get proof of delivery for an item
+  const getProofOfDelivery = (order, productId) => {
+    if (!order?.deliveryInfo?.items || !productId) return null;
+    const deliveryInfoItems = Array.isArray(order.deliveryInfo.items) ? order.deliveryInfo.items : [];
+    return deliveryInfoItems.find((item) => item.productId === productId)?.proofOfDelivery || null;
+  };
+
+  // Check if order is completed (not just delivered)
+  const isOrderCompleted = (o) => {
+    const orderStatus = String(o?.status || '').toLowerCase();
+    return orderStatus === 'completed';
+  };
+
   const isOrderDelivered = (o) => {
+    // Check if all assigned items are delivered
+    if (areAllItemsDelivered(o)) return true;
+
+    // Fallback to old logic
     const deliveryStatus = o?.deliveryInfo?.status || o?.deliveryStatus || o?.deliveryInfoStatus;
     if (deliveryStatus) return String(deliveryStatus).toLowerCase() === 'delivered';
     const orderStatus = o?.status;
@@ -137,7 +179,7 @@ export function DeliveryPersonnelDetail() {
     });
   };
 
-  const markAsDelivered = async (orderId) => {
+  const markAsCompleted = async (orderId) => {
     try {
       if (!orderId) return;
       setMarkingDelivered(true);
@@ -171,8 +213,8 @@ export function DeliveryPersonnelDetail() {
     return `${u?.firstName || ''} ${u?.lastName || ''}`.trim() || 'Delivery Personnel';
   }, [personnel]);
 
-  const statusCounts = stats?.statusCounts || {};
-  const deliveryStatusCounts = stats?.deliveryStatusCounts || {};
+  const itemStatusCounts = stats?.itemStatusCounts || {};
+  const orderStatusCounts = stats?.orderStatusCounts || {};
 
   const StatCard = ({ title, value }) => (
     <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200">
@@ -281,14 +323,15 @@ export function DeliveryPersonnelDetail() {
 
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Stats</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard title="Total Assigned Orders" value={stats?.totalAssignedOrders ?? 0} />
+          <StatCard title="Total Assigned Items" value={stats?.totalAssignedItems ?? 0} />
           <StatCard
             title="Total Expected Earnings"
             value={stats?.totalExpectedEarnings ? numberFormatter(stats.totalExpectedEarnings) : '₦0'}
           />
-          <StatCard title="Ready Orders" value={statusCounts?.ready ?? 0} />
-          <StatCard title="Assigned Deliveries" value={deliveryStatusCounts?.assigned ?? 0} />
+          <StatCard title="Ready Orders" value={orderStatusCounts?.ready ?? 0} />
+          <StatCard title="Picked Up Items" value={itemStatusCounts?.picked_up ?? 0} />
         </div>
       </div>
 
@@ -335,6 +378,9 @@ export function DeliveryPersonnelDetail() {
                       Delivery Fee
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Assigned Items
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -349,7 +395,7 @@ export function DeliveryPersonnelDetail() {
                   {orders.map((o) => (
                     <tr
                       key={o._id}
-                      onClick={() => fetchOrderDetail(o._id)}
+                      onClick={() => showOrderDetail(o)}
                       className="hover:bg-gray-50 transition-colors cursor-pointer"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -369,35 +415,48 @@ export function DeliveryPersonnelDetail() {
                         {o.totalAmount ? numberFormatter(o.totalAmount) : '₦0'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {o.deliveryFee ? numberFormatter(o.deliveryFee) : '₦0'}
+                        {o.totalDeliveryFee ? numberFormatter(o.totalDeliveryFee) : '₦0'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800 capitalize">
-                          {o.status || '—'}
-                        </span>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {Array.isArray(o.assignedItems) ? (
+                          <div>
+                            <span className="text-gray-500"> {o.totalItems || 0}</span>
+                          </div>
+                        ) : (
+                          '—'
+                        )}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(o.status)}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800 capitalize">
-                          {o?.deliveryInfo?.status || '—'}
+                          {o?.deliveryInfo?.status ?? '—'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        {!isOrderDelivered(o) ? (
+                        {!isOrderCompleted(o) ? (
                           <select
                             defaultValue=""
                             onChange={(e) => {
                               const v = e.target.value;
                               e.target.value = '';
-                              if (v === 'delivered') markAsDelivered(o._id);
+                              if (v === 'completed' && canMarkAsCompleted(o)) {
+                                markAsCompleted(o._id);
+                              } else if (v === 'completed' && !canMarkAsCompleted(o)) {
+                                customToast('Order must be delivered before marking as completed', true);
+                              }
                             }}
                             className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            disabled={!canMarkAsCompleted(o)}
+                            title={!canMarkAsCompleted(o) ? 'Order must be delivered before marking as completed' : ''}
                           >
                             <option value="">Actions</option>
-                            <option value="delivered">Mark as Delivered</option>
+                            <option value="completed" disabled={!canMarkAsCompleted(o)}>
+                              Mark as Completed
+                            </option>
                           </select>
                         ) : (
                           <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 capitalize">
-                            delivered
+                            completed
                           </span>
                         )}
                       </td>
@@ -452,18 +511,21 @@ export function DeliveryPersonnelDetail() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Order Details</h3>
               <div className="flex items-center gap-2">
-                {orderDetail && !isOrderDelivered(orderDetail) ? (
+                {orderDetail && !isOrderCompleted(orderDetail) ? (
                   <button
-                    onClick={() => markAsDelivered(orderDetail?._id)}
-                    disabled={markingDelivered}
+                    onClick={() => markAsCompleted(orderDetail?._id)}
+                    disabled={markingDelivered || !canMarkAsCompleted(orderDetail)}
                     className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                    title={
+                      !canMarkAsCompleted(orderDetail) ? 'Order must be delivered before marking as completed' : ''
+                    }
                   >
                     {markingDelivered ? <ImSpinner2 className="animate-spin" size={16} /> : null}
-                    Mark as Delivered
+                    Mark as Completed
                   </button>
                 ) : orderDetail ? (
                   <span className="px-3 py-2 bg-green-100 text-green-800 text-sm rounded-lg font-semibold">
-                    Delivered
+                    Completed
                   </span>
                 ) : null}
                 <button
@@ -475,12 +537,7 @@ export function DeliveryPersonnelDetail() {
               </div>
             </div>
 
-            {detailLoading ? (
-              <div className="py-12 flex items-center gap-2 justify-center">
-                <ImSpinner2 className="animate-spin" size={20} />
-                <p className="text-sm font-medium text-gray-600">Loading order details...</p>
-              </div>
-            ) : orderDetail ? (
+            {orderDetail ? (
               <div className="space-y-6">
                 {/* Order Info */}
                 <div className="grid grid-cols-2 gap-4">
@@ -570,10 +627,10 @@ export function DeliveryPersonnelDetail() {
                   </div>
                 )}
 
-                {/* Order Items */}
-                {orderDetail.items && orderDetail.items.length > 0 && (
+                {/* Assigned Items */}
+                {orderDetail.assignedItems && orderDetail.assignedItems.length > 0 && (
                   <div className="border-t pt-4">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Order Items</h4>
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Assigned Items</h4>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead className="bg-gray-50">
@@ -583,26 +640,105 @@ export function DeliveryPersonnelDetail() {
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                               Quantity
                             </th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                              Delivery Fee
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                              Assigned At
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                              Picked Up At
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                              Delivered At
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                              Proof of Delivery
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {orderDetail.items.map((item, idx) => (
-                            <tr key={idx}>
-                              <td className="px-4 py-2 text-sm text-gray-900">{item.productName || 'N/A'}</td>
-                              <td className="px-4 py-2 text-sm text-gray-900">{item.bakeryName || 'N/A'}</td>
-                              <td className="px-4 py-2 text-sm text-gray-900">
-                                {item.quantity} {item.unit || ''}
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-900">
-                                {item.price ? numberFormatter(item.price) : '₦0'}
-                              </td>
-                              <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                                {item.totalPrice ? numberFormatter(item.totalPrice) : '₦0'}
-                              </td>
-                            </tr>
-                          ))}
+                          {orderDetail.assignedItems.map((item, idx) => {
+                            const proofOfDelivery = getProofOfDelivery(orderDetail, item.productId);
+                            const isDelivered = item.status === 'delivered' || !!proofOfDelivery;
+
+                            return (
+                              <tr key={item._id || idx}>
+                                <td className="px-4 py-2 text-sm text-gray-900">{item.productName || 'N/A'}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{item.bakeryName || 'N/A'}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">
+                                  {item.quantity} {item.unit || ''}
+                                </td>
+                                <td className="px-4 py-2 text-sm text-gray-900">
+                                  {item.totalDeliveryFee ? numberFormatter(item.totalDeliveryFee) : '₦0'}
+                                  {item.deliveryFee && (
+                                    <span className="text-xs text-gray-500 block">
+                                      ({numberFormatter(item.deliveryFee)} × {item.quantity})
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2 text-sm">
+                                  <span
+                                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full capitalize ${
+                                      isDelivered
+                                        ? 'bg-green-100 text-green-800'
+                                        : item.status === 'picked_up'
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : item.status === 'assigned'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-gray-100 text-gray-800'
+                                    }`}
+                                  >
+                                    {isDelivered ? 'delivered' : item.status || 'N/A'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2 text-sm text-gray-900">
+                                  {item.assignedAt ? moment(item.assignedAt).format('MMM DD, YYYY HH:mm') : '—'}
+                                </td>
+                                <td className="px-4 py-2 text-sm text-gray-900">
+                                  {item.pickedUpAt ? moment(item.pickedUpAt).format('MMM DD, YYYY HH:mm') : '—'}
+                                </td>
+                                <td className="px-4 py-2 text-sm text-gray-900">
+                                  {item.deliveredAt ? moment(item.deliveredAt).format('MMM DD, YYYY HH:mm') : '—'}
+                                </td>
+                                <td className="px-4 py-2 text-sm">
+                                  {proofOfDelivery ? (
+                                    <div className="space-y-1 max-w-xs">
+                                      {proofOfDelivery.photo && (
+                                        <a
+                                          href={proofOfDelivery.photo}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-indigo-600 hover:text-indigo-800 text-xs underline block"
+                                        >
+                                          View Photo
+                                        </a>
+                                      )}
+                                      {proofOfDelivery.receivedBy && (
+                                        <p className="text-xs text-gray-600">
+                                          Received by: {proofOfDelivery.receivedBy}
+                                        </p>
+                                      )}
+                                      {proofOfDelivery.notes && (
+                                        <p className="text-xs text-gray-500 italic">Note: {proofOfDelivery.notes}</p>
+                                      )}
+                                      {proofOfDelivery.timestamp && (
+                                        <p className="text-xs text-gray-500">
+                                          {moment(proofOfDelivery.timestamp).format('MMM DD, YYYY HH:mm')}
+                                        </p>
+                                      )}
+                                      {proofOfDelivery.isSigned && (
+                                        <span className="text-xs text-green-600 font-semibold">✓ Signed</span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -622,7 +758,11 @@ export function DeliveryPersonnelDetail() {
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Delivery Fee:</span>
                       <span className="text-sm font-medium text-gray-900">
-                        {orderDetail.deliveryFee ? numberFormatter(orderDetail.deliveryFee) : '₦0'}
+                        {orderDetail.totalDeliveryFee
+                          ? numberFormatter(orderDetail.totalDeliveryFee)
+                          : orderDetail.deliveryFee
+                          ? numberFormatter(orderDetail.deliveryFee)
+                          : '₦0'}
                       </span>
                     </div>
                     <div className="flex justify-between border-t pt-2">

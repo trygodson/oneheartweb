@@ -21,4 +21,5 @@ export const ApiEndPoints = {
 
   DELIVERY_PERSONEL: '/delivery-management/personnel',
   DELIVERY_PLANS: '/delivery-management/plans',
+  DELIVERY_MANAGEMENT_ORDERS: '/delivery-management/orders',
 };

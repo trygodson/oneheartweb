@@ -38,6 +38,7 @@ export function DeliveryZoneClassification() {
   const [selectedZoneKey, setSelectedZoneKey] = useState(null);
   const [deliveryPersonnel, setDeliveryPersonnel] = useState([]);
   const [savingPlan, setSavingPlan] = useState(false);
+  const [activeTab, setActiveTab] = useState('live'); // 'live' or 'saved'
 
   useEffect(() => {
     fetchStates();
@@ -66,7 +67,7 @@ export function DeliveryZoneClassification() {
 
   useEffect(() => {
     fetchZonesData();
-  }, [selectedDate, selectedCityId]);
+  }, [selectedDate, selectedCityId, activeTab]);
 
   const getZoneKey = (zone) => zone?.zoneId ?? 'no-zone';
 
@@ -162,9 +163,15 @@ export function DeliveryZoneClassification() {
   const fetchZonesData = async () => {
     try {
       setLoading(true);
-      // Prefer saved plan (if available) to build the board, otherwise fallback to today's orders by zone
-      // IMPORTANT: Never call delivery plan endpoints without a cityId
-      if (selectedCityId) {
+
+      if (activeTab === 'saved') {
+        // Fetch saved plan - IMPORTANT: Never call delivery plan endpoints without a cityId
+        if (!selectedCityId) {
+          setZonesData(null);
+          setZones([]);
+          return;
+        }
+
         const planRes = await GetDeliveryPlanService({
           date: selectedDate,
           cityId: selectedCityId,
@@ -177,22 +184,119 @@ export function DeliveryZoneClassification() {
         if (planData?.zones?.length) {
           setZonesData(planData);
           setZones(planData.zones);
-          return;
+        } else {
+          setZonesData(null);
+          setZones([]);
         }
-      }
+      } else {
+        // Fetch live orders
+        const response = await GetShopOrdersTodayByDeliveryZoneService({
+          date: selectedDate,
+          cityId: selectedCityId || undefined,
+        });
+        if (response?.data?.success || response?.success) {
+          const dataRaw = response?.data?.data || response?.data;
+          let data = normalizeZonesPayload(dataRaw);
 
-      const response = await GetShopOrdersTodayByDeliveryZoneService({
-        date: selectedDate,
-        cityId: selectedCityId || undefined,
-      });
-      if (response?.data?.success || response?.success) {
-        const dataRaw = response?.data?.data || response?.data;
-        const data = normalizeZonesPayload(dataRaw);
-        setZonesData(data);
-        setZones(data?.zones || []);
+          // If cityId is selected, check for saved plan and merge assignments
+          if (selectedCityId) {
+            try {
+              const planRes = await GetDeliveryPlanService({
+                date: selectedDate,
+                cityId: selectedCityId,
+              });
+
+              const planOk = planRes?.data?.success || planRes?.success;
+              const planDataRaw = planOk ? planRes?.data?.data || planRes?.data : null;
+              const planData = planDataRaw ? normalizeZonesPayload(planDataRaw) : null;
+
+              if (planData?.zones?.length) {
+                // Create a map of saved plan orders by orderId for quick lookup
+                const savedOrdersMap = new Map();
+                planData.zones.forEach((savedZone) => {
+                  if (Array.isArray(savedZone.orders)) {
+                    savedZone.orders.forEach((savedOrder) => {
+                      const orderId = savedOrder.orderId || savedOrder._id;
+                      if (orderId) {
+                        savedOrdersMap.set(orderId, savedOrder);
+                      }
+                    });
+                  }
+                });
+
+                // Merge saved plan assignments into live orders
+                data.zones = data.zones.map((liveZone) => {
+                  const liveZoneKey = getZoneKey(liveZone);
+
+                  // Find corresponding saved zone
+                  const savedZone = planData.zones.find((sz) => getZoneKey(sz) === liveZoneKey);
+
+                  if (savedZone && Array.isArray(liveZone.orders)) {
+                    // Update orders with saved plan data if they exist in saved plan
+                    const updatedOrders = liveZone.orders.map((liveOrder) => {
+                      const orderId = liveOrder.orderId || liveOrder._id;
+                      const savedOrder = savedOrdersMap.get(orderId);
+
+                      if (savedOrder) {
+                        // Create a map of saved items by productId for matching
+                        const savedItemsMap = new Map();
+                        if (Array.isArray(savedOrder.items)) {
+                          savedOrder.items.forEach((savedItem) => {
+                            const productId = savedItem.productId || savedItem._id;
+                            if (productId) {
+                              savedItemsMap.set(productId, savedItem);
+                            }
+                          });
+                        }
+
+                        // Merge saved order (with assignments) into live order
+                        return {
+                          ...liveOrder,
+                          assignedToDeliveryPersonnelId:
+                            savedOrder.assignedToDeliveryPersonnelId || liveOrder.assignedToDeliveryPersonnelId,
+                          items: Array.isArray(liveOrder.items)
+                            ? liveOrder.items.map((liveItem) => {
+                                const productId = liveItem.productId || liveItem._id;
+                                const savedItem = productId ? savedItemsMap.get(productId) : null;
+
+                                return {
+                                  ...liveItem,
+                                  assignedToDeliveryPersonnelId:
+                                    savedItem?.assignedToDeliveryPersonnelId || liveItem?.assignedToDeliveryPersonnelId,
+                                };
+                              })
+                            : [],
+                        };
+                      }
+                      return liveOrder;
+                    });
+
+                    return {
+                      ...liveZone,
+                      orders: updatedOrders,
+                    };
+                  }
+
+                  return liveZone;
+                });
+              }
+            } catch (planError) {
+              // If saved plan fetch fails, just use live orders
+              console.error('Error fetching saved plan for merge:', planError);
+            }
+          }
+
+          setZonesData(data);
+          setZones(data?.zones || []);
+        } else {
+          setZonesData(null);
+          setZones([]);
+        }
       }
     } catch (error) {
       console.error('Error fetching zones data:', error);
+      setZonesData(null);
+      setZones([]);
     } finally {
       setLoading(false);
     }
@@ -456,27 +560,57 @@ export function DeliveryZoneClassification() {
   return (
     <div className="py-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Delivery Zone Classification</h1>
-          {/* <p className="text-sm text-gray-500">View orders classified by delivery zones</p> */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Delivery Zone Classification</h1>
+            <p className="text-sm text-gray-500 mt-1">View and manage delivery zone assignments</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {activeTab === 'live' && (
+              <button
+                onClick={handleSavePlan}
+                disabled={savingPlan || loading || !selectedCityId}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {savingPlan ? <ImSpinner2 className="animate-spin" size={18} /> : null}
+                Save Plan
+              </button>
+            )}
+            <button
+              onClick={handleRefresh}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+            >
+              <MdRefresh size={18} />
+              Refresh
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSavePlan}
-            disabled={savingPlan || loading || !selectedCityId}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-          >
-            {savingPlan ? <ImSpinner2 className="animate-spin" size={18} /> : null}
-            Save Plan
-          </button>
-          <button
-            onClick={handleRefresh}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
-          >
-            <MdRefresh size={18} />
-            Refresh
-          </button>
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-8" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('live')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'live'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Live Orders
+            </button>
+            <button
+              onClick={() => setActiveTab('saved')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'saved'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Saved Plans
+            </button>
+          </nav>
         </div>
       </div>
       {/* Filters */}
@@ -583,10 +717,17 @@ export function DeliveryZoneClassification() {
             <ImSpinner2 className="animate-spin" size={24} />
             <p className="text-sm font-medium text-gray-600">Loading zones data...</p>
           </div>
+        ) : activeTab === 'saved' && !selectedCityId ? (
+          <div className="bg-white rounded-xl shadow-sm p-20 flex flex-col justify-center items-center">
+            <img className="w-32" src={empty} alt="no data" />
+            <p className="font-medium text-gray-500 mt-4">Please select a city to view saved plans</p>
+          </div>
         ) : zones.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-20 flex flex-col justify-center items-center">
             <img className="w-32" src={empty} alt="no data" />
-            <p className="font-medium text-gray-500 mt-4">No zones found</p>
+            <p className="font-medium text-gray-500 mt-4">
+              {activeTab === 'saved' ? 'No saved plans found for this date and city' : 'No zones found'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 pb-4">
@@ -594,46 +735,52 @@ export function DeliveryZoneClassification() {
               <div
                 key={getZoneKey(zone)}
                 className="bg-gray-50 rounded-lg shadow-sm min-w-0"
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, getZoneKey(zone))}
+                onDragOver={activeTab === 'live' ? handleDragOver : undefined}
+                onDrop={activeTab === 'live' ? (e) => handleDrop(e, getZoneKey(zone)) : undefined}
               >
                 {/* Zone Header */}
                 <div
-                  className="bg-white rounded-t-lg p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-t-lg border-b-2 border-indigo-200 cursor-pointer hover:from-indigo-100 hover:to-blue-100 transition-all"
                   onClick={() => openZoneSummary(getZoneKey(zone))}
                 >
-                  <h3 className="text-base font-semibold text-gray-900 mb-1">{zone.zoneName || 'No Zone Assigned'}</h3>
-                  {zone.cityId && <p className="text-xs text-gray-500">City ID: {zone.cityId}</p>}
-                  <div className="flex items-center gap-4 mt-3 text-xs">
-                    <div>
-                      <span className="text-gray-500">Orders: </span>
-                      <span className="font-semibold text-gray-900">{zone.totalOrders || 0}</span>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-base font-bold text-gray-900 leading-tight">
+                        {zone.zoneName || 'No Zone Assigned'}
+                      </h3>
+                      <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
+                        {zone.totalOrders || 0}
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-gray-500">Revenue: </span>
-                      <span className="font-semibold text-gray-900">{numberFormatter(zone.totalRevenue || 0)}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Items: </span>
-                      <span className="font-semibold text-gray-900">{zone.totalItems || 0}</span>
+                    <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-indigo-200/50">
+                      <div>
+                        <p className="text-xs text-gray-600 mb-0.5">Revenue</p>
+                        <p className="text-sm font-bold text-gray-900">{numberFormatter(zone.totalRevenue || 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 mb-0.5">Items</p>
+                        <p className="text-sm font-bold text-gray-900">{zone.totalItems || 0}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Zone Orders - Kanban Cards */}
-                <div className="p-3 space-y-2 min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto">
+                <div className="p-3 space-y-2 min-h-[200px] max-h-[600px] overflow-y-auto overflow-x-hidden">
                   {zone.orders && zone.orders.length > 0 ? (
                     zone.orders.map((order) => (
                       <div
                         key={order._id}
-                        draggable={String(order?.status || '').toLowerCase() === 'ready'}
-                        onDragStart={(e) => handleDragStart(e, order, getZoneKey(zone))}
-                        onDragEnd={handleDragEnd}
+                        draggable={activeTab === 'live' && String(order?.status || '').toLowerCase() === 'ready'}
+                        onDragStart={
+                          activeTab === 'live' ? (e) => handleDragStart(e, order, getZoneKey(zone)) : undefined
+                        }
+                        onDragEnd={activeTab === 'live' ? handleDragEnd : undefined}
                         onClick={() => fetchOrderDetail(order._id)}
                         className={`bg-white rounded-lg p-3 shadow-sm border border-gray-200 hover:shadow-md transition-all hover:border-indigo-300 ${
-                          String(order?.status || '').toLowerCase() === 'ready'
+                          activeTab === 'live' && String(order?.status || '').toLowerCase() === 'ready'
                             ? 'cursor-move'
-                            : 'cursor-pointer opacity-75'
+                            : 'cursor-pointer'
                         }`}
                       >
                         <div className="flex items-start justify-between mb-2">
