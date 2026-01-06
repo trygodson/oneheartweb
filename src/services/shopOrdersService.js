@@ -46,6 +46,15 @@ export async function SaveDeliveryPlanService(p) {
   const response = await api.post(`${ApiEndPoints.DELIVERY_PLANS}`, p);
   return response;
 }
+export async function DeleteDeliveryPlanService({ date, cityId }) {
+  const params = new URLSearchParams();
+  if (date) params.append('date', date);
+  if (cityId) params.append('cityId', cityId);
+  const queryString = params.toString();
+  const url = queryString ? `${ApiEndPoints.DELIVERY_PLANS}?${queryString}` : ApiEndPoints.DELIVERY_PLANS;
+  const response = await api.delete(url);
+  return response;
+}
 
 export async function GetDeliveryPlanService({ date, cityId }) {
   const params = new URLSearchParams();
@@ -65,6 +74,18 @@ export async function GetShopOrdersTodayByDeliveryZoneService({ date, cityId }) 
   const url = queryString
     ? `${ApiEndPoints.SHOP_ORDERS_TODAY_BY_DELIVERY_ZONE}?${queryString}`
     : ApiEndPoints.SHOP_ORDERS_TODAY_BY_DELIVERY_ZONE;
+  const response = await api.get(url);
+  return response;
+}
+export async function GetPersonelOrderStatusService({ orderId, deliveryPersonnelId, productId }) {
+  const params = new URLSearchParams();
+  if (orderId) params.append('orderId', orderId);
+  if (deliveryPersonnelId) params.append('deliveryPersonnelId', deliveryPersonnelId);
+  if (productId) params.append('productId', productId);
+  const queryString = params.toString();
+  const url = queryString
+    ? `${ApiEndPoints.DELIVERY_MANAGEMENT_ORDERS_PERSONEL_ORDER_STATUS}?${queryString}`
+    : ApiEndPoints.DELIVERY_MANAGEMENT_ORDERS_PERSONEL_ORDER_STATUS;
   const response = await api.get(url);
   return response;
 }

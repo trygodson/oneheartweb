@@ -8,6 +8,8 @@ import {
   GetShopOrderDetailByIdService,
   GetDeliveryPlanService,
   SaveDeliveryPlanService,
+  DeleteDeliveryPlanService,
+  GetPersonelOrderStatusService,
 } from '../../services/shopOrdersService';
 import {
   GetLocationStateService,
@@ -39,6 +41,12 @@ export function DeliveryZoneClassification() {
   const [deliveryPersonnel, setDeliveryPersonnel] = useState([]);
   const [savingPlan, setSavingPlan] = useState(false);
   const [activeTab, setActiveTab] = useState('live'); // 'live' or 'saved'
+  const [savePlanModalOpen, setSavePlanModalOpen] = useState(false);
+  const [deliveryPlanDate, setDeliveryPlanDate] = useState(moment().format('YYYY-MM-DD'));
+  const [deletePlanModalOpen, setDeletePlanModalOpen] = useState(false);
+  const [deletingPlan, setDeletingPlan] = useState(false);
+  const [itemDeliveryStatuses, setItemDeliveryStatuses] = useState(new Map());
+  const [loadingItemStatuses, setLoadingItemStatuses] = useState(false);
 
   useEffect(() => {
     fetchStates();
@@ -70,6 +78,75 @@ export function DeliveryZoneClassification() {
   }, [selectedDate, selectedCityId, activeTab]);
 
   const getZoneKey = (zone) => zone?.zoneId ?? 'no-zone';
+
+  // Fetch delivery statuses for assigned items when zone summary modal opens
+  useEffect(() => {
+    const fetchItemDeliveryStatuses = async () => {
+      if (!zoneSummaryOpen || !selectedZoneKey) {
+        return;
+      }
+
+      // Find the selected zone
+      const currentSelectedZone = zones.find((z) => getZoneKey(z) === selectedZoneKey);
+      if (!currentSelectedZone) {
+        return;
+      }
+
+      // Collect all assigned items
+      const assignedItems = [];
+      if (Array.isArray(currentSelectedZone.orders)) {
+        currentSelectedZone.orders.forEach((order) => {
+          const orderId = order?._id ?? order?.orderId;
+          if (Array.isArray(order.items)) {
+            order.items.forEach((item) => {
+              const personnelId = item?.assignedToDeliveryPersonnelId;
+              const productId = item?.productId ?? item?._id;
+              if (personnelId && productId && orderId) {
+                assignedItems.push({ orderId, personnelId, productId });
+              }
+            });
+          }
+        });
+      }
+
+      if (assignedItems.length === 0) {
+        setItemDeliveryStatuses(new Map());
+        return;
+      }
+
+      setLoadingItemStatuses(true);
+      const statusMap = new Map();
+
+      try {
+        // Fetch statuses for all assigned items
+        const statusPromises = assignedItems.map(async ({ orderId, personnelId, productId }) => {
+          try {
+            const response = await GetPersonelOrderStatusService({
+              orderId,
+              deliveryPersonnelId: personnelId,
+              productId,
+            });
+            const key = `${orderId}-${productId}-${personnelId}`;
+            const statusData = response?.data?.data || response?.data;
+            if (statusData) {
+              statusMap.set(key, statusData);
+            }
+          } catch (error) {
+            console.error(`Error fetching status for order ${orderId}, product ${productId}:`, error);
+          }
+        });
+
+        await Promise.all(statusPromises);
+        setItemDeliveryStatuses(statusMap);
+      } catch (error) {
+        console.error('Error fetching item delivery statuses:', error);
+      } finally {
+        setLoadingItemStatuses(false);
+      }
+    };
+
+    fetchItemDeliveryStatuses();
+  }, [zoneSummaryOpen, selectedZoneKey, zones]);
 
   const normalizeZonesPayload = (raw) => {
     const data = raw || {};
@@ -431,7 +508,15 @@ export function DeliveryZoneClassification() {
     setZoneSummaryOpen(true);
   };
 
-  const selectedZone = zones.find((z) => getZoneKey(z) === selectedZoneKey) || null;
+  // Clear statuses when modal closes
+  useEffect(() => {
+    if (!zoneSummaryOpen) {
+      setItemDeliveryStatuses(new Map());
+      setLoadingItemStatuses(false);
+    }
+  }, [zoneSummaryOpen]);
+
+  const selectedZone = zones?.find((z) => getZoneKey(z) === selectedZoneKey) ?? null;
 
   const getAssignedPersonnelName = (personnelId) => {
     if (!personnelId) return null;
@@ -475,12 +560,21 @@ export function DeliveryZoneClassification() {
         return { ...z, orders: nextOrders };
       }),
     );
+    // Clear statuses when assignment changes to trigger refresh
+    if (zoneSummaryOpen && selectedZoneKey === zoneKey) {
+      setItemDeliveryStatuses(new Map());
+    }
   };
 
   const handleSavePlan = async () => {
     try {
       if (!selectedCityId) {
         customToast('Please select a City before saving a delivery plan.', true);
+        return;
+      }
+
+      if (!deliveryPlanDate) {
+        customToast('Please select a delivery date.', true);
         return;
       }
 
@@ -506,7 +600,7 @@ export function DeliveryZoneClassification() {
       });
 
       const payload = {
-        date: selectedDate,
+        date: deliveryPlanDate,
         cityId: selectedCityId,
         zones: zones.map((z) => ({
           zoneId: z?.zoneId ?? null,
@@ -544,6 +638,7 @@ export function DeliveryZoneClassification() {
       const ok = res?.data?.success || res?.success;
       if (ok) {
         customToast(res?.data?.message || res?.message || 'Delivery plan saved');
+        setSavePlanModalOpen(false);
         // Refresh from backend so UI reflects canonical saved state
         await fetchZonesData();
       } else {
@@ -555,6 +650,63 @@ export function DeliveryZoneClassification() {
     } finally {
       setSavingPlan(false);
     }
+  };
+
+  const handleOpenSavePlanModal = () => {
+    if (!selectedCityId) {
+      customToast('Please select a City before saving a delivery plan.', true);
+      return;
+    }
+    setDeliveryPlanDate(selectedDate); // Default to current selected date
+    setSavePlanModalOpen(true);
+  };
+
+  const handleDeletePlan = async () => {
+    try {
+      if (!selectedCityId) {
+        customToast('Please select a City before deleting a delivery plan.', true);
+        return;
+      }
+
+      if (!selectedDate) {
+        customToast('Please select a Date before deleting a delivery plan.', true);
+        return;
+      }
+
+      setDeletingPlan(true);
+
+      const res = await DeleteDeliveryPlanService({
+        date: selectedDate,
+        cityId: selectedCityId,
+      });
+
+      const ok = res?.data?.success || res?.success;
+      if (ok) {
+        customToast(res?.data?.message || res?.message || 'Delivery plan deleted successfully');
+        setDeletePlanModalOpen(false);
+        // Refresh from backend so UI reflects the deletion
+        await fetchZonesData();
+      } else {
+        customToast('Failed to delete delivery plan', true);
+      }
+    } catch (e) {
+      console.error('Delete plan error:', e);
+      customToast(e?.message || 'Failed to delete delivery plan', true);
+    } finally {
+      setDeletingPlan(false);
+    }
+  };
+
+  const handleOpenDeletePlanModal = () => {
+    if (!selectedCityId) {
+      customToast('Please select a City before deleting a delivery plan.', true);
+      return;
+    }
+    if (!selectedDate) {
+      customToast('Please select a Date before deleting a delivery plan.', true);
+      return;
+    }
+    setDeletePlanModalOpen(true);
   };
 
   return (
@@ -569,12 +721,21 @@ export function DeliveryZoneClassification() {
           <div className="flex items-center gap-2">
             {activeTab === 'live' && (
               <button
-                onClick={handleSavePlan}
-                disabled={savingPlan || loading || !selectedCityId}
+                onClick={handleOpenSavePlanModal}
+                disabled={loading || !selectedCityId}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
-                {savingPlan ? <ImSpinner2 className="animate-spin" size={18} /> : null}
                 Save Plan
+              </button>
+            )}
+            {activeTab === 'saved' && selectedCityId && selectedDate && (
+              <button
+                onClick={handleOpenDeletePlanModal}
+                disabled={loading || deletingPlan}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {deletingPlan ? <ImSpinner2 className="animate-spin" size={18} /> : null}
+                Delete Plan
               </button>
             )}
             <button
@@ -1152,36 +1313,87 @@ export function DeliveryZoneClassification() {
                                   <div className="space-y-2">
                                     {o.items.map((it, idx) => {
                                       const itemAssigned = it?.assignedToDeliveryPersonnelId || '';
+                                      const productId = it?.productId ?? it?._id;
+                                      const statusKey =
+                                        itemAssigned && productId ? `${oid}-${productId}-${itemAssigned}` : null;
+                                      const deliveryStatus = statusKey ? itemDeliveryStatuses.get(statusKey) : null;
+                                      const isDropdownDisabled = deliveryStatus && deliveryStatus.status !== 'assigned';
+
                                       return (
-                                        <div
-                                          key={`${oid}_${idx}`}
-                                          className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded"
-                                        >
-                                          <span className="truncate pr-2 flex-1">
-                                            {it?.productName || 'Item'} {it?.bakeryName ? `• ${it.bakeryName}` : ''} •{' '}
-                                            {it?.quantity ?? ''} {it?.unit || ''} •{' '}
-                                            {it?.totalPrice ? numberFormatter(it.totalPrice) : ''}
-                                          </span>
-                                          <select
-                                            value={itemAssigned}
-                                            onChange={(e) =>
-                                              setItemPersonnel(getZoneKey(selectedZone), oid, idx, e.target.value)
-                                            }
-                                            className="px-2 py-1 border border-gray-300 rounded text-xs min-w-[120px]"
-                                          >
-                                            <option value="">Unassigned</option>
-                                            {deliveryPersonnel.map((p) => {
-                                              const pid = p?._id;
-                                              const name =
-                                                `${p?.userId?.firstName || ''} ${p?.userId?.lastName || ''}`.trim() ||
-                                                'Unnamed';
-                                              return (
-                                                <option key={pid} value={pid}>
-                                                  {name}
-                                                </option>
-                                              );
-                                            })}
-                                          </select>
+                                        <div key={`${oid}_${idx}`} className="bg-gray-50 p-2 rounded">
+                                          <div className="flex items-center justify-between mb-1">
+                                            <span className="truncate pr-2 flex-1 text-xs">
+                                              {it?.productName || 'Item'} {it?.bakeryName ? `• ${it.bakeryName}` : ''} •{' '}
+                                              {it?.quantity ?? ''} {it?.unit || ''} •{' '}
+                                              {it?.totalPrice ? numberFormatter(it.totalPrice) : ''}
+                                            </span>
+                                            <select
+                                              value={itemAssigned}
+                                              onChange={(e) =>
+                                                setItemPersonnel(getZoneKey(selectedZone), oid, idx, e.target.value)
+                                              }
+                                              disabled={isDropdownDisabled}
+                                              className="px-2 py-1 border border-gray-300 rounded text-xs min-w-[120px] disabled:opacity-60 disabled:cursor-not-allowed"
+                                            >
+                                              <option value="">Unassigned</option>
+                                              {deliveryPersonnel.map((p) => {
+                                                const pid = p?._id;
+                                                const name =
+                                                  `${p?.userId?.firstName || ''} ${p?.userId?.lastName || ''}`.trim() ||
+                                                  'Unnamed';
+                                                return (
+                                                  <option key={pid} value={pid}>
+                                                    {name}
+                                                  </option>
+                                                );
+                                              })}
+                                            </select>
+                                          </div>
+                                          {itemAssigned && (
+                                            <div className="mt-2 pt-2 border-t border-gray-200">
+                                              {loadingItemStatuses ? (
+                                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                                  <ImSpinner2 className="animate-spin" size={12} />
+                                                  <span>Loading status...</span>
+                                                </div>
+                                              ) : deliveryStatus ? (
+                                                <div className="space-y-1">
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-gray-600">Status:</span>
+                                                    <span
+                                                      className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                                        deliveryStatus.status === 'delivered'
+                                                          ? 'bg-green-100 text-green-800'
+                                                          : deliveryStatus.status === 'picked_up'
+                                                          ? 'bg-blue-100 text-blue-800'
+                                                          : deliveryStatus.status === 'assigned'
+                                                          ? 'bg-yellow-100 text-yellow-800'
+                                                          : 'bg-gray-100 text-gray-800'
+                                                      }`}
+                                                    >
+                                                      {deliveryStatus.status || 'N/A'}
+                                                    </span>
+                                                  </div>
+                                                  {deliveryStatus.assignedAt && (
+                                                    <div className="text-xs text-gray-500">
+                                                      Assigned:{' '}
+                                                      {moment(deliveryStatus.assignedAt).format('MMM DD, YYYY HH:mm')}
+                                                    </div>
+                                                  )}
+                                                  {deliveryStatus.deliveryDate && (
+                                                    <div className="text-xs text-gray-500">
+                                                      Delivery Date:{' '}
+                                                      {moment(deliveryStatus.deliveryDate).format('MMM DD, YYYY HH:mm')}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <div className="text-xs text-gray-400 italic">
+                                                  No status information available
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
                                       );
                                     })}
@@ -1199,6 +1411,134 @@ export function DeliveryZoneClassification() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Save Plan Modal */}
+      {savePlanModalOpen && (
+        <div
+          data-modal-backdrop
+          className="fixed inset-0 bg-black/60 overflow-hidden grid place-content-center z-[10003]"
+          onClick={() => setSavePlanModalOpen(false)}
+        >
+          <div
+            data-modal
+            className="bg-white rounded-xl p-6 min-w-[400px] max-w-[500px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Save Delivery Plan</h3>
+              <button
+                onClick={() => setSavePlanModalOpen(false)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                disabled={savingPlan}
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Delivery Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={deliveryPlanDate}
+                  onChange={(e) => setDeliveryPlanDate(e.target.value)}
+                  min={moment().format('YYYY-MM-DD')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  disabled={savingPlan}
+                />
+                <p className="text-xs text-gray-500 mt-1">Select the date for which this delivery plan will be saved</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setSavePlanModalOpen(false)}
+                  disabled={savingPlan}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSavePlan}
+                  disabled={savingPlan || !deliveryPlanDate}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {savingPlan ? <ImSpinner2 className="animate-spin" size={18} /> : null}
+                  Save Plan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Plan Confirmation Modal */}
+      {deletePlanModalOpen && (
+        <div
+          data-modal-backdrop
+          className="fixed inset-0 bg-black/60 overflow-hidden grid place-content-center z-[10004]"
+          onClick={() => setDeletePlanModalOpen(false)}
+        >
+          <div
+            data-modal
+            className="bg-white rounded-xl p-6 min-w-[400px] max-w-[500px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Delete Delivery Plan</h3>
+              <button
+                onClick={() => setDeletePlanModalOpen(false)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                disabled={deletingPlan}
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-700 mb-2">Are you sure you want to delete the delivery plan for:</p>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Date:</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {selectedDate ? moment(selectedDate).format('MMM DD, YYYY') : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">City:</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {cities.find((c) => c._id === selectedCityId)?.name || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-red-600 mt-3 font-medium">
+                  This action cannot be undone. All saved assignments will be lost.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setDeletePlanModalOpen(false)}
+                  disabled={deletingPlan}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeletePlan}
+                  disabled={deletingPlan}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {deletingPlan ? <ImSpinner2 className="animate-spin" size={18} /> : null}
+                  Delete Plan
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
